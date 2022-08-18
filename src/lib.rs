@@ -1,5 +1,6 @@
-struct Base {
-}
+use std::iter::FromIterator;
+
+struct Base {}
 
 // base64
 const BYTE_LENGTH: usize = 3;
@@ -31,14 +32,16 @@ impl Base {
         //     v.chunks(len)
         // }
 
-        fn to_base_char(bytes: Vec<u8>) -> String {
+        fn to_base_char(bytes: Vec<u8>, pad_len: usize) -> String {
             let base64_chars: Vec<char> = BASE64_TABLE.chars().collect();
 
             let mut base_chars: Vec<char> = vec!();
-            for chunks in bytes.chunks(BYTE_LENGTH) {
-                let c0 = &chunks[0];
-                let c1 = &chunks[1];
-                let c2 = &chunks[2];
+            let chunks = bytes.chunks(BYTE_LENGTH);
+            let count = &chunks.len();
+            for (i, c) in chunks.enumerate() {
+                let c0 = &c[0];
+                let c1 = &c[1];
+                let c2 = &c[2];
 
                 let first = (c0 & 252) / 4;
                 let second = ((c0 & 3) * 16) + ((c1 & 240) / 16);
@@ -47,8 +50,17 @@ impl Base {
 
                 base_chars.push(base64_chars[first as usize]);
                 base_chars.push(base64_chars[second as usize]);
-                base_chars.push(base64_chars[third as usize]);
-                base_chars.push(base64_chars[fourth as usize]);
+                if pad_len == 2 && *count == i + 1 {
+                    base_chars.push('=');
+                } else {
+                    base_chars.push(base64_chars[third as usize]);
+                }
+
+                if pad_len >= 1 && *count == i + 1 {
+                    base_chars.push('=');
+                } else {
+                    base_chars.push(base64_chars[fourth as usize]);
+                }
             }
 
             String::from_iter(base_chars.iter())
@@ -59,15 +71,18 @@ impl Base {
         // let three_bytes: Chunks<u8> = as_3bytes(bytes);
 
         let remain = bytes.len() % BYTE_LENGTH;
+        let pad_len = match remain {
+            1 | 2 => BYTE_LENGTH - remain,
+            _ => 0,
+        };
         let mut v = bytes.to_vec();
-        if remain != 0 {
-            let pad_len = BYTE_LENGTH - remain;
+        if pad_len != 0 {
             for _ in 0..pad_len {
                 v.push(b'\0')
             }
         }
 
-        to_base_char(v)
+        to_base_char(v, pad_len)
     }
 }
 
@@ -81,9 +96,9 @@ mod tests {
 
         assert_eq!("", base.base64_encode(""));
         assert_eq!("Zg==", base.base64_encode("f"));
-        // assert_eq!("Zm8=", base.base64_encode("fo"));
-        // assert_eq!("Zm9v", base.base64_encode("foo"));
-        // assert_eq!("Zm9vYg==", base.base64_encode("foob"));
+        assert_eq!("Zm8=", base.base64_encode("fo"));
+        assert_eq!("Zm9v", base.base64_encode("foo"));
+        assert_eq!("Zm9vYg==", base.base64_encode("foob"));
     }
 
     #[test]
